@@ -8,61 +8,61 @@ async function main(): Promise<void> {
   sheet.columns = [
     { header: 'sku', key: 'sku', width: 15 },
     { header: 'name', key: 'name', width: 25 },
-    { header: 'price', key: 'price', width: 10 },
-    { header: 'inventory', key: 'inventory', width: 12 },
     { header: 'description', key: 'description', width: 30 },
+    { header: 'price', key: 'price', width: 10 },
     { header: 'category', key: 'category', width: 15 },
-    { header: 'colors', key: 'colors', width: 20 },
+    { header: 'color', key: 'color', width: 12 },
+    { header: 'stock', key: 'stock', width: 10 },
   ];
 
   sheet.addRows([
     {
       sku: 'SKU-001',
       name: 'Classic T-Shirt',
-      price: 19.99,
-      inventory: 100,
       description: 'A comfortable cotton t-shirt',
+      price: 19.99,
       category: 'Apparel',
-      colors: 'Red, Blue, Black',
+      color: 'Blue',
+      stock: 100,
     },
     {
       sku: 'SKU-002',
       name: 'Running Shoes',
-      price: 59.99,
-      inventory: 50,
       description: 'Lightweight running shoes',
+      price: 59.99,
       category: 'Footwear',
-      colors: 'White',
+      color: 'White',
+      stock: 50,
     },
     {
-      // Row intentionally missing a price -> should land in failed-rows.xlsx
+      // Missing price -> should land in failed-rows.xlsx
       sku: 'SKU-003',
       name: 'Missing Price Item',
-      price: '',
-      inventory: 20,
       description: 'This row is missing a price',
+      price: '',
       category: 'Apparel',
-      colors: '',
+      color: 'Black',
+      stock: 20,
     },
     {
-      // Row intentionally reuses SKU-001 -> should be flagged as duplicate
+      // Reuses SKU-001 -> should be flagged as a duplicate
       sku: 'SKU-001',
       name: 'Duplicate SKU Item',
-      price: 9.99,
-      inventory: 10,
       description: 'This SKU duplicates row 1',
+      price: 9.99,
       category: 'Apparel',
-      colors: '',
+      color: 'Red',
+      stock: 10,
     },
     {
-      // Row intentionally has non-numeric inventory -> should fail validation
+      // Non-numeric stock -> should fail validation
       sku: 'SKU-004',
-      name: 'Bad Inventory Item',
+      name: 'Bad Stock Item',
+      description: 'Stock is not a number',
       price: 15,
-      inventory: 'abc',
-      description: 'Inventory is not a number',
       category: 'Apparel',
-      colors: '',
+      color: 'Green',
+      stock: 'abc',
     },
   ]);
 

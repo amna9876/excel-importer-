@@ -1,0 +1,47 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UploadBatchStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model Product {
+  id          String    @id @default(uuid())
+  sku         String    @unique
+  name        String
+  description String
+  price       Decimal   @db.Decimal(10, 2)
+  category    String
+  color       String
+  stock       Int
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Soft-deleted rows stay in the table (audit trail, referential safety)
+  // but every read path filters deletedAt: null — see ProductService.
+  @@index([deletedAt])
+}
+
+model UploadBatch {
+  id            String            @id @default(uuid())
+  userEmail     String
+  fileKey       String
+  status        UploadBatchStatus @default(PENDING)
+  totalRows     Int               @default(0)
+  successCount  Int               @default(0)
+  failCount     Int               @default(0)
+  errorFileKey  String?
+  errorMessage  String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+}
