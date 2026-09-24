@@ -7,6 +7,13 @@ import { FailedRow, RawProductRow } from './processing.types';
 
 const REQUIRED_HEADERS = ['sku', 'name', 'description', 'price', 'category', 'color', 'stock'];
 
+// Real-world sheets name these two columns inconsistently (the plan itself
+// said "inventory/stock" and "colors") — accept the common variants.
+const HEADER_ALIASES: Record<string, string[]> = {
+  color: ['color', 'colors'],
+  stock: ['stock', 'inventory'],
+};
+
 // Excel cells can hold plain strings/numbers, Date objects, rich text
 // ({ richText: [...] }), or formula results ({ formula, result }). This
 // normalizes any of those into a plain trimmed string.
@@ -44,7 +51,10 @@ export class ExcelService {
     const headerMap: Record<string, number> = {};
     worksheet.getRow(1).eachCell((cell, colNumber) => {
       const header = cellToText(cell.value).toLowerCase();
-      if (header) headerMap[header] = colNumber;
+      if (!header) return;
+      const canonical =
+        Object.entries(HEADER_ALIASES).find(([, aliases]) => aliases.includes(header))?.[0] ?? header;
+      headerMap[canonical] = colNumber;
     });
 
     const missingHeaders = REQUIRED_HEADERS.filter((h) => !(h in headerMap));

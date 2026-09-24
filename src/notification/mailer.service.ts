@@ -7,6 +7,7 @@ import { FileProcessedEvent } from '../processing/processing.types';
 const REQUIRED_COLUMNS_NOTE = [
   'Required columns for future uploads (first row = headers):',
   '  sku, name, description, price, category, color, stock',
+  '  ("color" also accepts "colors"; "stock" also accepts "inventory")',
   '',
   '- sku, name, description, category, color: text, required',
   '- sku must be unique across all products',
