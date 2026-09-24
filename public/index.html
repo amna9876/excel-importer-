@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Product Bulk Importer</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --border: #334155;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+    --green: #4ade80;
+    --red: #f87171;
+    --yellow: #facc15;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    padding: 24px 16px 64px;
+  }
+  main { max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 1.5rem; margin-bottom: 4px; }
+  .subtitle { color: var(--muted); margin-top: 0; margin-bottom: 24px; font-size: 0.9rem; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+  .card h2 { margin-top: 0; font-size: 1.05rem; }
+  label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; margin-top: 14px; }
+  input[type="email"], input[type="file"] {
+    width: 100%;
+    padding: 9px 10px;
+    background: #0b1222;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 0.9rem;
+  }
+  button {
+    margin-top: 16px;
+    background: var(--accent);
+    color: #06283d;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 0.9rem;
+  }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.secondary {
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+  }
+  button.danger { background: var(--red); color: #3b0a0a; }
+  button.small { padding: 5px 10px; font-size: 0.78rem; margin-top: 0; }
+  .status-line { margin-top: 14px; font-size: 0.88rem; }
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+  .badge.PENDING, .badge.PROCESSING { background: rgba(250,204,21,0.15); color: var(--yellow); }
+  .badge.COMPLETED { background: rgba(74,222,128,0.15); color: var(--green); }
+  .badge.FAILED { background: rgba(248,113,113,0.15); color: var(--red); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; font-size: 0.78rem; text-transform: uppercase; }
+  .row-actions { display: flex; gap: 6px; }
+  .empty { color: var(--muted); font-size: 0.85rem; padding: 12px 0; }
+  .top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .required-format { font-size: 0.8rem; color: var(--muted); margin-top: 10px; line-height: 1.5; }
+  code { background: #0b1222; padding: 1px 5px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Product Bulk Importer</h1>
+  <p class="subtitle">Upload an Excel sheet of products &mdash; it's processed in the background, then you get an email summary.</p>
+
+  <section class="card">
+    <h2>Upload products</h2>
+    <form id="upload-form">
+      <label for="file">Excel file (.xlsx or .xls)</label>
+      <input type="file" id="file" name="file" accept=".xlsx,.xls" required />
+
+      <label for="email">Your email (for the summary report)</label>
+      <input type="email" id="email" name="userEmail" placeholder="you@example.com" required />
+
+      <button type="submit" id="upload-btn">Upload</button>
+    </form>
+    <div id="status" class="status-line"></div>
+    <p class="required-format">
+      Required columns (first row = headers): <code>sku</code>, <code>name</code>,
+      <code>description</code>, <code>price</code>, <code>category</code>, <code>color</code>,
+      <code>stock</code>. <code>sku</code> must be unique; <code>price</code> &gt; 0; <code>stock</code> &ge; 0.
+    </p>
+  </section>
+
+  <section class="card">
+    <div class="top-row">
+      <h2 style="margin:0;">Products</h2>
+      <button class="secondary small" id="refresh-btn">Refresh</button>
+    </div>
+    <table id="products-table">
+      <thead>
+        <tr>
+          <th>SKU</th><th>Name</th><th>Price</th><th>Stock</th><th>Category</th><th>Color</th><th></th>
+        </tr>
+      </thead>
+      <tbody id="products-body"></tbody>
+    </table>
+    <div id="products-empty" class="empty" style="display:none;">No products yet &mdash; upload a file above.</div>
+  </section>
+
+  <section class="card" id="deleted-card" style="display:none;">
+    <h2>Recently deleted (this session)</h2>
+    <table>
+      <thead><tr><th>SKU</th><th>Name</th><th></th></tr></thead>
+      <tbody id="deleted-body"></tbody>
+    </table>
+  </section>
+</main>
+
+<script>
+const statusEl = document.getElementById('status');
+const productsBody = document.getElementById('products-body');
+const productsEmpty = document.getElementById('products-empty');
+const deletedCard = document.getElementById('deleted-card');
+const deletedBody = document.getElementById('deleted-body');
+const recentlyDeleted = new Map();
+
+function money(v) {
+  return '$' + Number(v).toFixed(2);
+}
+
+async function fetchProducts() {
+  const res = await fetch('/products');
+  const products = await res.json();
+  productsBody.innerHTML = '';
+  productsEmpty.style.display = products.length ? 'none' : 'block';
+  for (const p of products) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${p.sku}</td>
+      <td>${p.name}</td>
+      <td>${money(p.price)}</td>
+      <td>${p.stock}</td>
+      <td>${p.category}</td>
+      <td>${p.color}</td>
+      <td class="row-actions">
+        <button class="danger small" data-delete="${p.id}">Delete</button>
+      </td>`;
+    productsBody.appendChild(tr);
+  }
+  document.querySelectorAll('[data-delete]').forEach((btn) => {
+    btn.addEventListener('click', () => deleteProduct(btn.getAttribute('data-delete')));
+  });
+}
+
+async function deleteProduct(id) {
+  const res = await fetch(`/products/${id}`, { method: 'DELETE' });
+  if (!res.ok) return;
+  const product = await res.json();
+  recentlyDeleted.set(id, product);
+  renderDeleted();
+  fetchProducts();
+}
+
+async function restoreProduct(id) {
+  const res = await fetch(`/products/${id}/restore`, { method: 'POST' });
+  if (!res.ok) return;
+  recentlyDeleted.delete(id);
+  renderDeleted();
+  fetchProducts();
+}
+
+function renderDeleted() {
+  deletedCard.style.display = recentlyDeleted.size ? 'block' : 'none';
+  deletedBody.innerHTML = '';
+  for (const [id, p] of recentlyDeleted) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${p.sku}</td>
+      <td>${p.name}</td>
+      <td><button class="secondary small" data-restore="${id}">Restore</button></td>`;
+    deletedBody.appendChild(tr);
+  }
+  document.querySelectorAll('[data-restore]').forEach((btn) => {
+    btn.addEventListener('click', () => restoreProduct(btn.getAttribute('data-restore')));
+  });
+}
+
+document.getElementById('refresh-btn').addEventListener('click', fetchProducts);
+
+let pollTimer = null;
+
+async function pollBatch(batchId) {
+  const res = await fetch(`/uploads/${batchId}`);
+  const batch = await res.json();
+  const done = batch.status === 'COMPLETED' || batch.status === 'FAILED';
+  statusEl.innerHTML = `
+    Batch <code>${batch.batchId.slice(0, 8)}</code> &mdash;
+    <span class="badge ${batch.status}">${batch.status}</span>
+    ${done ? `&mdash; ${batch.successCount ?? 0} succeeded, ${batch.failCount ?? 0} failed of ${batch.totalRows ?? 0}` : '(processing in the background…)'}
+  `;
+  if (done) {
+    clearTimeout(pollTimer);
+    document.getElementById('upload-btn').disabled = false;
+    fetchProducts();
+    if (batch.failCount > 0) {
+      statusEl.innerHTML += `<br/><span style="color:var(--muted)">Check your email for the failed-rows spreadsheet and reasons.</span>`;
+    }
+  } else {
+    pollTimer = setTimeout(() => pollBatch(batchId), 2000);
+  }
+}
+
+document.getElementById('upload-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fileInput = document.getElementById('file');
+  const email = document.getElementById('email').value;
+  if (!fileInput.files[0]) return;
+
+  const formData = new FormData();
+  formData.append('file', fileInput.files[0]);
+  formData.append('userEmail', email);
+
+  const btn = document.getElementById('upload-btn');
+  btn.disabled = true;
+  statusEl.textContent = 'Uploading…';
+
+  try {
+    const res = await fetch('/uploads', { method: 'POST', body: formData });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      statusEl.innerHTML = `<span style="color:var(--red)">${err.message || 'Upload failed.'}</span>`;
+      btn.disabled = false;
+      return;
+    }
+    const { batchId } = await res.json();
+    pollBatch(batchId);
+  } catch (err) {
+    statusEl.innerHTML = `<span style="color:var(--red)">${err.message}</span>`;
+    btn.disabled = false;
+  }
+});
+
+fetchProducts();
+</script>
+</body>
+</html>
