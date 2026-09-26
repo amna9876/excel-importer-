@@ -23,6 +23,11 @@ const envSchema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   EMAIL_FROM: z.string().default('Product Imports <no-reply@example.com>'),
+
+  // Optional HTTPS email relay (Google Apps Script). Used instead of SMTP when
+  // set, for hosts that block outbound SMTP such as Railway's trial plan.
+  EMAIL_RELAY_URL: z.string().optional(),
+  EMAIL_RELAY_TOKEN: z.string().optional(),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

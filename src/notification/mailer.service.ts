@@ -69,6 +69,12 @@ export class MailerService {
         : []),
     ];
 
+    const relayUrl = this.config.get<string>('EMAIL_RELAY_URL');
+    if (relayUrl) {
+      await this.sendViaRelay(relayUrl, userEmail, bodyLines.join('\n'), attachments);
+      return;
+    }
+
     await this.transporter.sendMail({
       from: this.from,
       to: userEmail,
@@ -76,5 +82,33 @@ export class MailerService {
       text: bodyLines.join('\n'),
       attachments,
     });
+  }
+
+  private async sendViaRelay(
+    relayUrl: string,
+    to: string,
+    text: string,
+    attachments: Array<{ filename: string; content: Buffer; contentType: string }>,
+  ): Promise<void> {
+    const response = await fetch(relayUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        token: this.config.get<string>('EMAIL_RELAY_TOKEN'),
+        to,
+        subject: 'Import summary',
+        text,
+        attachments: attachments.map((a) => ({
+          filename: a.filename,
+          mimeType: a.contentType,
+          contentBase64: a.content.toString('base64'),
+        })),
+      }),
+    });
+
+    const result = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+    if (!response.ok || !result.ok) {
+      throw new Error(`Email relay failed: ${result.error ?? response.status}`);
+    }
   }
 }
