@@ -11,6 +11,7 @@ export interface FileProcessedEvent {
   successCount: number;
   failCount: number;
   errorFileKey?: string;
+  successFileKey?: string;
 }
 
 export interface RawProductRow {

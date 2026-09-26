@@ -96,6 +96,17 @@ export class ProcessingProcessor extends WorkerHost {
       );
     }
 
+    let successFileKey: string | undefined;
+    if (successCount > 0) {
+      const successBuffer = await this.excel.generateSuccessWorkbook(toInsert);
+      successFileKey = `imported-rows/${batchId}.xlsx`;
+      await this.s3.uploadBuffer(
+        successFileKey,
+        successBuffer,
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      );
+    }
+
     await this.prisma.uploadBatch.update({
       where: { id: batchId },
       data: {
@@ -114,6 +125,7 @@ export class ProcessingProcessor extends WorkerHost {
       successCount,
       failCount,
       errorFileKey,
+      successFileKey,
     });
   }
 

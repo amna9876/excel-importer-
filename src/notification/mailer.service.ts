@@ -41,20 +41,32 @@ export class MailerService {
   }
 
   async sendImportReport(event: FileProcessedEvent): Promise<void> {
-    const { userEmail, totalRows, successCount, failCount, errorFileKey } = event;
+    const { userEmail, totalRows, successCount, failCount, errorFileKey, successFileKey } = event;
 
-    // The RabbitMQ event only carries the S3 key, not the file itself
+    // The RabbitMQ event only carries the S3 keys, not the files themselves
     // (message buses are for small payloads) — so re-download here.
     const attachmentBuffer = errorFileKey ? await this.s3.downloadBuffer(errorFileKey) : undefined;
+    const successBuffer = successFileKey ? await this.s3.downloadBuffer(successFileKey) : undefined;
 
     const bodyLines = [
       `${successCount} of ${totalRows} products imported successfully. ${failCount} failed.`,
       '',
+      successBuffer ? 'imported-products.xlsx (attached) lists the products that were imported.' : '',
       failCount > 0
-        ? 'See the attached spreadsheet for the rows that failed and why.'
+        ? 'failed-rows.xlsx (attached) lists the rows that failed and why.'
         : 'All rows were imported without errors.',
       '',
       REQUIRED_COLUMNS_NOTE,
+    ];
+
+    const xlsxType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    const attachments = [
+      ...(successBuffer
+        ? [{ filename: 'imported-products.xlsx', content: successBuffer, contentType: xlsxType }]
+        : []),
+      ...(attachmentBuffer
+        ? [{ filename: 'failed-rows.xlsx', content: attachmentBuffer, contentType: xlsxType }]
+        : []),
     ];
 
     await this.transporter.sendMail({
@@ -62,16 +74,7 @@ export class MailerService {
       to: userEmail,
       subject: 'Import summary',
       text: bodyLines.join('\n'),
-      attachments: attachmentBuffer
-        ? [
-            {
-              filename: 'failed-rows.xlsx',
-              content: attachmentBuffer,
-              contentType:
-                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            },
-          ]
-        : [],
+      attachments,
     });
   }
 }

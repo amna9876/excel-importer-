@@ -117,6 +117,30 @@ export class ExcelService {
     return { valid: true, data: instance };
   }
 
+  async generateSuccessWorkbook(products: ProductRowDto[]): Promise<Buffer> {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Imported Products');
+
+    sheet.columns = [
+      { header: 'sku', key: 'sku', width: 20 },
+      { header: 'name', key: 'name', width: 25 },
+      { header: 'description', key: 'description', width: 30 },
+      { header: 'price', key: 'price', width: 12 },
+      { header: 'category', key: 'category', width: 18 },
+      { header: 'color', key: 'color', width: 14 },
+      { header: 'stock', key: 'stock', width: 10 },
+    ];
+
+    for (const product of products) {
+      sheet.addRow(product);
+    }
+
+    sheet.getRow(1).font = { bold: true };
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    return buffer as unknown as Buffer;
+  }
+
   async generateErrorWorkbook(failedRows: FailedRow[]): Promise<Buffer> {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Failed Rows');
