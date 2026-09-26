@@ -215,6 +215,9 @@ async function pollBatch(batchId) {
     clearTimeout(pollTimer);
     document.getElementById('upload-btn').disabled = false;
     fetchProducts();
+    if (batch.status === 'FAILED' && batch.errorMessage) {
+      statusEl.innerHTML += `<br/><span style="color:var(--red)">Reason: ${batch.errorMessage}</span>`;
+    }
     if (batch.failCount > 0) {
       statusEl.innerHTML += `<br/><span style="color:var(--muted)">Check your email for the failed-rows spreadsheet and reasons.</span>`;
     }

@@ -10,8 +10,12 @@ const REQUIRED_HEADERS = ['sku', 'name', 'description', 'price', 'category', 'co
 // Real-world sheets name these two columns inconsistently (the plan itself
 // said "inventory/stock" and "colors") — accept the common variants.
 const HEADER_ALIASES: Record<string, string[]> = {
-  color: ['color', 'colors'],
-  stock: ['stock', 'inventory'],
+  sku: ['sku', 'sku code'],
+  name: ['name', 'product name', 'product_name', 'title'],
+  description: ['description', 'product description'],
+  price: ['price', 'unit price'],
+  color: ['color', 'colors', 'colour', 'colours'],
+  stock: ['stock', 'inventory', 'quantity', 'qty'],
 };
 
 // Excel cells can hold plain strings/numbers, Date objects, rich text

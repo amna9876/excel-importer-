@@ -79,6 +79,7 @@ export class UploadController {
       totalRows: batch.totalRows,
       successCount: batch.successCount,
       failCount: batch.failCount,
+      errorMessage: batch.errorMessage,
       createdAt: batch.createdAt,
       updatedAt: batch.updatedAt,
     };
