@@ -1,10 +1,15 @@
 # E-commerce Product Processor
 
-Event-driven bulk product import: a client uploads an Excel sheet, the file
-is stashed in S3-compatible storage, an event announces the upload over
-RabbitMQ, a BullMQ worker does the actual parsing/validating/inserting, and
-Nodemailer emails a summary (with a failed-rows spreadsheet attached, if any
-rows failed).
+Event-driven bulk product import: a client uploads an Excel sheet (from a
+small web page, or via the API directly), the file is stashed in
+S3-compatible storage, an event announces the upload over RabbitMQ, a BullMQ
+worker does the actual parsing/validating/inserting, and Nodemailer emails a
+summary — with the imported-products and failed-rows spreadsheets attached,
+whichever apply.
+
+**Live deployment:** https://excel-importer-production-dace.up.railway.app
+(hosted on Railway; see [Deployment](#deployment) below for how it's wired up
+and why email works differently there than in local dev).
 
 See [`docs/PROCESSOR_GUIDE.md`](docs/PROCESSOR_GUIDE.md) for the full
 concept write-up — what RabbitMQ vs. BullMQ are for, why event-driven
@@ -36,6 +41,9 @@ Client → POST /uploads → S3 (raw file) → UploadBatch (status: PENDING)
 Client → GET /uploads/:id → polls UploadBatch status/counts
 Client → GET/DELETE /products, POST /products/:id/restore → soft-delete CRUD
 ```
+
+`public/index.html` is a small static page (upload form, live status, product
+table) served at `/` alongside the API — see [Using it](#4-using-it) below.
 
 Everything above runs in **one Nest process** (`npm run start:dev`) — it's a
 hybrid app that serves HTTP and listens on RabbitMQ at the same time. That's
@@ -85,17 +93,31 @@ S3 API via `@aws-sdk/client-s3` pointed at a custom endpoint.
    S3_FORCE_PATH_STYLE=true
    ```
 
-### Email — Ethereal for zero-config local testing
-No real SMTP account needed. Go to https://ethereal.email/, click "Create
-Ethereal Account", and put the generated credentials in `.env`:
+### Email — two options
+
+**Local dev (fake inbox, zero setup):** go to https://ethereal.email/, click
+"Create Ethereal Account", and put the generated credentials in `.env`:
 ```
 SMTP_HOST=smtp.ethereal.email
 SMTP_PORT=587
 SMTP_USER=<generated user>
 SMTP_PASS=<generated pass>
 ```
-Sent mail shows up in Ethereal's web inbox, not a real mailbox — swap in real
-SMTP credentials when you're ready for production.
+Sent mail shows up in Ethereal's web inbox, not a real mailbox.
+
+**Real email (e.g. for a deployed instance):** point `SMTP_HOST` at
+`smtp.gmail.com` with a Gmail address and an
+[app password](https://myaccount.google.com/apppasswords). This works from a
+local machine, but **some hosts (Railway's free plan included) block outbound
+SMTP entirely**, so a direct Gmail connection from there just times out.
+
+For those hosts, use the `EMAIL_RELAY_URL`/`EMAIL_RELAY_TOKEN` pair instead of
+`SMTP_*`. It points at a small Google Apps Script web app (deployed from your
+own Google account, `Deploy → New deployment → Web app`, access set to
+**Anyone**) that receives the email payload over HTTPS — which isn't blocked
+— and sends it via `MailApp.sendEmail` from your real Gmail. See
+`MailerService.sendViaRelay` in the code for the exact payload shape. When
+`EMAIL_RELAY_URL` is set, it's used instead of SMTP; otherwise SMTP is used.
 
 ## 2. Setup
 
@@ -114,7 +136,14 @@ One process, one terminal. On boot you should see both "HTTP listening on
 port 4000" and "RabbitMQ microservice connected" — if the second line is
 missing or errors, double-check `RABBITMQ_URL`.
 
-## 4. Generate a test file and try the full flow
+## 4. Using it
+
+Open http://localhost:4000 (or the deployed URL) for the web page: a
+drag-and-drop upload with a live status timeline, a product table with
+delete/restore, and search. Or use the API directly, as in the curl examples
+below — the page and the API hit the exact same endpoints.
+
+## 5. Generate a test file and try the full flow
 
 ```bash
 npm run sample:generate
@@ -158,5 +187,26 @@ First row = headers, any order:
 |---|---|---|---|---|---|---|
 | SKU-001 | Classic T-Shirt | A comfortable cotton t-shirt | 19.99 | Apparel | Blue | 100 |
 
-A failed row's reasons show up in the `errors` column of the emailed
-`failed-rows.xlsx`.
+Header matching is case-insensitive, and two columns accept a common
+alternate name: `color` also accepts `colors`, and `stock` also accepts
+`inventory`. A file missing a required column is rejected outright (with the
+missing column names in the error); a file with the right columns but bad
+row data still processes, and the bad rows land in the emailed
+`failed-rows.xlsx` instead, each with a reason in its `errors` column.
+
+## Deployment
+
+The live instance runs on [Railway](https://railway.com), deployed straight
+from this repo's `main` branch — every push redeploys it automatically.
+
+- **Build command:** `npm install && npx prisma generate && npm run build`
+- **Start command:** `npm run start:prod`
+- **Environment variables:** the same ones from `.env.example`, minus `PORT`
+  (Railway injects its own) and using `EMAIL_RELAY_URL`/`EMAIL_RELAY_TOKEN`
+  instead of `SMTP_*` — Railway's plan blocks outbound SMTP, so a direct
+  Gmail connection times out there even though it works locally.
+- **Public URL:** Settings → Networking → Generate Domain.
+
+To deploy your own copy on a different host, the same build/start commands
+apply; whether you need the `EMAIL_RELAY_*` workaround depends on whether
+that host allows outbound SMTP.
