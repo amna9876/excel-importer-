@@ -35,11 +35,12 @@ export class ProcessingProcessor extends WorkerHost {
     const fileBuffer = await this.s3.downloadBuffer(fileKey);
     const rawRows = await this.excel.parseRows(fileBuffer);
 
-    // Pre-fetch which of the file's SKUs already exist, in one query,
-    // instead of hitting the DB per row.
+    // Pre-fetch which of the file's SKUs already exist among *active*
+    // products, in one query, instead of hitting the DB per row. A
+    // soft-deleted product's SKU is free to reuse.
     const skusInFile = rawRows.map((r) => r.sku).filter(Boolean);
     const existing = await this.prisma.product.findMany({
-      where: { sku: { in: skusInFile } },
+      where: { sku: { in: skusInFile }, deletedAt: null },
       select: { sku: true },
     });
     const existingSkus = new Set(existing.map((p) => p.sku));

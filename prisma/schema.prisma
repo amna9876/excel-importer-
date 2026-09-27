@@ -16,7 +16,7 @@ enum UploadBatchStatus {
 
 model Product {
   id          String    @id @default(uuid())
-  sku         String    @unique
+  sku         String
   name        String
   description String
   price       Decimal   @db.Decimal(10, 2)
@@ -28,8 +28,12 @@ model Product {
   updatedAt   DateTime  @updatedAt
 
   // Soft-deleted rows stay in the table (audit trail, referential safety)
-  // but every read path filters deletedAt: null — see ProductService.
+  // but every read path filters deletedAt: null — see ProductService. SKU
+  // uniqueness is enforced only among active rows by a partial index added
+  // in a raw-SQL migration (Prisma's schema syntax has no partial-unique
+  // support), so a deleted product's SKU becomes reusable.
   @@index([deletedAt])
+  @@index([sku])
 }
 
 model UploadBatch {
