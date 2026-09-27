@@ -6,96 +6,237 @@
 <title>Product Bulk Importer</title>
 <style>
   :root {
-    --bg: #0f172a;
-    --panel: #1e293b;
-    --border: #334155;
-    --text: #e2e8f0;
-    --muted: #94a3b8;
+    --bg: #0b1120;
+    --panel: #161f36;
+    --panel-2: #1c2742;
+    --border: #2c3a5c;
+    --text: #e7ecf7;
+    --muted: #93a1c1;
     --accent: #38bdf8;
+    --accent-dim: rgba(56,189,248,0.12);
     --green: #4ade80;
+    --green-dim: rgba(74,222,128,0.12);
     --red: #f87171;
+    --red-dim: rgba(248,113,113,0.12);
     --yellow: #facc15;
+    --yellow-dim: rgba(250,204,21,0.12);
   }
   * { box-sizing: border-box; }
   body {
     margin: 0;
-    background: var(--bg);
+    background:
+      radial-gradient(1200px 500px at 15% -10%, rgba(56,189,248,0.08), transparent),
+      var(--bg);
     color: var(--text);
     font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-    padding: 24px 16px 64px;
+    padding: 32px 16px 64px;
   }
-  main { max-width: 900px; margin: 0 auto; }
-  h1 { font-size: 1.5rem; margin-bottom: 4px; }
-  .subtitle { color: var(--muted); margin-top: 0; margin-bottom: 24px; font-size: 0.9rem; }
+  main { max-width: 920px; margin: 0 auto; }
+  .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  .brand-mark {
+    width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0;
+    background: linear-gradient(135deg, var(--accent), #6366f1);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px;
+  }
+  h1 { font-size: 1.4rem; margin: 0; letter-spacing: -0.01em; }
+  .subtitle { color: var(--muted); margin: 6px 0 26px; font-size: 0.92rem; }
   .card {
     background: var(--panel);
     border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 20px;
-    margin-bottom: 24px;
+    border-radius: 14px;
+    padding: 22px;
+    margin-bottom: 22px;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.02) inset, 0 8px 24px -12px rgba(0,0,0,0.4);
   }
-  .card h2 { margin-top: 0; font-size: 1.05rem; }
-  label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; margin-top: 14px; }
-  input[type="email"], input[type="file"] {
+  .card h2 { margin: 0 0 16px; font-size: 1rem; display: flex; align-items: center; gap: 8px; }
+  label { display: block; font-size: 0.82rem; color: var(--muted); margin-bottom: 6px; margin-top: 16px; font-weight: 500; }
+  label:first-of-type { margin-top: 0; }
+
+  .dropzone {
+    border: 1.5px dashed var(--border);
+    border-radius: 10px;
+    padding: 22px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+    background: #0e1526;
+  }
+  .dropzone:hover, .dropzone.drag { border-color: var(--accent); background: var(--accent-dim); }
+  .dropzone input[type=file] { display: none; }
+  .dropzone .dz-icon { font-size: 26px; display: block; margin-bottom: 6px; }
+  .dropzone .dz-text { font-size: 0.88rem; color: var(--text); }
+  .dropzone .dz-hint { font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
+  .dropzone .dz-file { font-size: 0.85rem; color: var(--accent); font-weight: 600; margin-top: 4px; word-break: break-all; }
+
+  input[type="email"] {
     width: 100%;
-    padding: 9px 10px;
-    background: #0b1222;
+    padding: 10px 12px;
+    background: #0e1526;
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: 8px;
     color: var(--text);
     font-size: 0.9rem;
+    transition: border-color .15s;
   }
+  input[type="email"]:focus { outline: none; border-color: var(--accent); }
+
   button {
-    margin-top: 16px;
+    margin-top: 18px;
     background: var(--accent);
-    color: #06283d;
+    color: #04202f;
     border: none;
-    padding: 10px 18px;
-    border-radius: 6px;
-    font-weight: 600;
+    padding: 11px 20px;
+    border-radius: 8px;
+    font-weight: 700;
     cursor: pointer;
     font-size: 0.9rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: transform .1s, opacity .15s;
   }
+  button:active { transform: scale(0.98); }
   button:disabled { opacity: 0.5; cursor: not-allowed; }
   button.secondary {
     background: transparent;
     color: var(--accent);
-    border: 1px solid var(--accent);
+    border: 1px solid var(--border);
+    margin-top: 0;
   }
   button.danger { background: var(--red); color: #3b0a0a; }
-  button.small { padding: 5px 10px; font-size: 0.78rem; margin-top: 0; }
-  .status-line { margin-top: 14px; font-size: 0.88rem; }
-  .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
-  .badge.PENDING, .badge.PROCESSING { background: rgba(250,204,21,0.15); color: var(--yellow); }
-  .badge.COMPLETED { background: rgba(74,222,128,0.15); color: var(--green); }
-  .badge.FAILED { background: rgba(248,113,113,0.15); color: var(--red); }
-  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); }
-  th { color: var(--muted); font-weight: 500; font-size: 0.78rem; text-transform: uppercase; }
+  button.small { padding: 6px 12px; font-size: 0.78rem; margin-top: 0; }
+  .spinner {
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 2px solid rgba(4,32,47,0.35); border-top-color: #04202f;
+    animation: spin .7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Timeline */
+  .timeline { display: flex; align-items: flex-start; margin-top: 22px; }
+  .tl-step { flex: 1; text-align: center; position: relative; }
+  .tl-dot {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--panel-2); border: 2px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 8px; font-size: 13px; color: var(--muted);
+    transition: all .2s; position: relative; z-index: 1;
+  }
+  .tl-line {
+    position: absolute; top: 13px; left: -50%; width: 100%; height: 2px;
+    background: var(--border); z-index: 0;
+  }
+  .tl-step:first-child .tl-line { display: none; }
+  .tl-label { font-size: 0.72rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+  .tl-step.done .tl-dot { background: var(--green-dim); border-color: var(--green); color: var(--green); }
+  .tl-step.done .tl-line { background: var(--green); }
+  .tl-step.active .tl-dot { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); animation: pulse 1.4s ease-in-out infinite; }
+  .tl-step.active .tl-label { color: var(--text); }
+  .tl-step.error .tl-dot { background: var(--red-dim); border-color: var(--red); color: var(--red); }
+  .tl-step.error .tl-label { color: var(--red); }
+  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(56,189,248,0.35); } 50% { box-shadow: 0 0 0 6px rgba(56,189,248,0); } }
+
+  .status-line { margin-top: 16px; font-size: 0.88rem; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 0.74rem; font-weight: 700; letter-spacing: .02em; }
+  .badge.PENDING, .badge.PROCESSING { background: var(--yellow-dim); color: var(--yellow); }
+  .badge.COMPLETED { background: var(--green-dim); color: var(--green); }
+  .badge.FAILED { background: var(--red-dim); color: var(--red); }
+
+  /* Result stat cards */
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 18px; }
+  .stat {
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 10px; text-align: center;
+  }
+  .stat .num { font-size: 1.5rem; font-weight: 800; line-height: 1; }
+  .stat .lbl { font-size: 0.72rem; color: var(--muted); margin-top: 6px; text-transform: uppercase; letter-spacing: .03em; }
+  .stat.total .num { color: var(--text); }
+  .stat.ok .num { color: var(--green); }
+  .stat.bad .num { color: var(--red); }
+  .ratio-bar { height: 8px; border-radius: 999px; background: var(--red-dim); overflow: hidden; margin-top: 14px; }
+  .ratio-fill { height: 100%; background: var(--green); border-radius: 999px 0 0 999px; transition: width .4s ease; }
+
+  .alert { border-radius: 10px; padding: 12px 14px; font-size: 0.85rem; margin-top: 14px; }
+  .alert.error { background: var(--red-dim); border: 1px solid rgba(248,113,113,0.35); color: #ffd7d3; }
+  .alert.info { background: var(--panel-2); border: 1px solid var(--border); color: var(--muted); }
+
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; min-width: 620px; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 0.72rem; text-transform: uppercase; letter-spacing: .03em; }
+  tbody tr { transition: background .12s; }
+  tbody tr:hover { background: rgba(255,255,255,0.02); }
+  td.desc { max-width: 220px; color: var(--muted); }
+  td.desc span {
+    display: block; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; cursor: help;
+  }
+  td.sku { font-family: ui-monospace, Consolas, monospace; font-size: 0.8rem; color: var(--accent); }
   .row-actions { display: flex; gap: 6px; }
-  .empty { color: var(--muted); font-size: 0.85rem; padding: 12px 0; }
-  .top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-  .required-format { font-size: 0.8rem; color: var(--muted); margin-top: 10px; line-height: 1.5; }
-  code { background: #0b1222; padding: 1px 5px; border-radius: 4px; }
+  .empty { color: var(--muted); font-size: 0.85rem; padding: 20px 0; text-align: center; }
+  .top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .count-pill {
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 999px;
+    padding: 2px 10px; font-size: 0.75rem; color: var(--muted); font-weight: 600;
+  }
+  .search-box {
+    width: 100%; padding: 9px 12px; margin-bottom: 14px;
+    background: #0e1526; border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-size: 0.85rem;
+  }
+  .search-box:focus { outline: none; border-color: var(--accent); }
+  .required-format { font-size: 0.78rem; color: var(--muted); margin-top: 14px; line-height: 1.6; border-top: 1px solid var(--border); padding-top: 14px; }
+  code { background: #0e1526; padding: 1px 6px; border-radius: 4px; color: var(--accent); font-size: 0.85em; }
+
+  @media (max-width: 560px) {
+    .stats { grid-template-columns: 1fr; }
+    .tl-label { display: none; }
+  }
 </style>
 </head>
 <body>
 <main>
-  <h1>Product Bulk Importer</h1>
-  <p class="subtitle">Upload an Excel sheet of products &mdash; it's processed in the background, then you get an email summary.</p>
+  <div class="brand">
+    <div class="brand-mark">📦</div>
+    <h1>Product Bulk Importer</h1>
+  </div>
+  <p class="subtitle">Upload an Excel sheet of products — it's processed in the background, then you get an email summary.</p>
 
   <section class="card">
     <h2>Upload products</h2>
     <form id="upload-form">
-      <label for="file">Excel file (.xlsx or .xls)</label>
-      <input type="file" id="file" name="file" accept=".xlsx,.xls" required />
+      <label>Excel file (.xlsx or .xls)</label>
+      <div class="dropzone" id="dropzone">
+        <span class="dz-icon">⬆️</span>
+        <div class="dz-text" id="dz-text">Drag a file here, or click to browse</div>
+        <div class="dz-hint">.xlsx or .xls, up to 10 MB</div>
+        <div class="dz-file" id="dz-file"></div>
+        <input type="file" id="file" name="file" accept=".xlsx,.xls" required />
+      </div>
 
       <label for="email">Your email (for the summary report)</label>
       <input type="email" id="email" name="userEmail" placeholder="you@example.com" required />
 
       <button type="submit" id="upload-btn">Upload</button>
     </form>
+
+    <div id="timeline" class="timeline" style="display:none;">
+      <div class="tl-step" data-step="uploaded"><div class="tl-line"></div><div class="tl-dot">1</div><div class="tl-label">Uploaded</div></div>
+      <div class="tl-step" data-step="queued"><div class="tl-line"></div><div class="tl-dot">2</div><div class="tl-label">Queued</div></div>
+      <div class="tl-step" data-step="processing"><div class="tl-line"></div><div class="tl-dot">3</div><div class="tl-label">Processing</div></div>
+      <div class="tl-step" data-step="done"><div class="tl-line"></div><div class="tl-dot">4</div><div class="tl-label">Done</div></div>
+    </div>
+
     <div id="status" class="status-line"></div>
+    <div id="stats" class="stats" style="display:none;">
+      <div class="stat total"><div class="num" id="stat-total">0</div><div class="lbl">Rows read</div></div>
+      <div class="stat ok"><div class="num" id="stat-ok">0</div><div class="lbl">Imported</div></div>
+      <div class="stat bad"><div class="num" id="stat-bad">0</div><div class="lbl">Failed</div></div>
+    </div>
+    <div class="ratio-bar" id="ratio-bar" style="display:none;"><div class="ratio-fill" id="ratio-fill"></div></div>
+    <div id="alerts"></div>
+
     <p class="required-format">
       Required columns (first row = headers): <code>sku</code>, <code>name</code>,
       <code>description</code>, <code>price</code>, <code>category</code>, <code>color</code>,
@@ -106,18 +247,21 @@
 
   <section class="card">
     <div class="top-row">
-      <h2 style="margin:0;">Products</h2>
-      <button class="secondary small" id="refresh-btn">Refresh</button>
+      <h2 style="margin:0;">Products <span class="count-pill" id="count-pill">0</span></h2>
+      <button class="secondary small" id="refresh-btn">↻ Refresh</button>
     </div>
-    <table id="products-table">
-      <thead>
-        <tr>
-          <th>SKU</th><th>Name</th><th>Price</th><th>Stock</th><th>Category</th><th>Color</th><th></th>
-        </tr>
-      </thead>
-      <tbody id="products-body"></tbody>
-    </table>
-    <div id="products-empty" class="empty" style="display:none;">No products yet &mdash; upload a file above.</div>
+    <input type="text" class="search-box" id="search-box" placeholder="Search by SKU, name or category…" />
+    <div class="table-wrap">
+      <table id="products-table">
+        <thead>
+          <tr>
+            <th>SKU</th><th>Name</th><th>Description</th><th>Price</th><th>Stock</th><th>Category</th><th>Color</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="products-body"></tbody>
+      </table>
+    </div>
+    <div id="products-empty" class="empty" style="display:none;">No products yet — upload a file above to get started.</div>
   </section>
 
   <section class="card" id="deleted-card" style="display:none;">
@@ -131,30 +275,53 @@
 
 <script>
 const statusEl = document.getElementById('status');
+const alertsEl = document.getElementById('alerts');
+const statsEl = document.getElementById('stats');
+const ratioBar = document.getElementById('ratio-bar');
+const ratioFill = document.getElementById('ratio-fill');
+const timelineEl = document.getElementById('timeline');
 const productsBody = document.getElementById('products-body');
 const productsEmpty = document.getElementById('products-empty');
+const countPill = document.getElementById('count-pill');
+const searchBox = document.getElementById('search-box');
 const deletedCard = document.getElementById('deleted-card');
 const deletedBody = document.getElementById('deleted-body');
 const recentlyDeleted = new Map();
+let allProducts = [];
 
 function money(v) {
   return '$' + Number(v).toFixed(2);
 }
 
-async function fetchProducts() {
-  const res = await fetch('/products');
-  const products = await res.json();
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+function renderProducts() {
+  const q = searchBox.value.trim().toLowerCase();
+  const rows = q
+    ? allProducts.filter((p) =>
+        [p.sku, p.name, p.category].some((v) => String(v ?? '').toLowerCase().includes(q)))
+    : allProducts;
+
+  countPill.textContent = allProducts.length;
   productsBody.innerHTML = '';
-  productsEmpty.style.display = products.length ? 'none' : 'block';
-  for (const p of products) {
+  productsEmpty.style.display = allProducts.length ? 'none' : 'block';
+  productsEmpty.textContent = allProducts.length && !rows.length
+    ? 'No products match your search.'
+    : 'No products yet — upload a file above to get started.';
+  if (allProducts.length && !rows.length) productsEmpty.style.display = 'block';
+
+  for (const p of rows) {
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${p.sku}</td>
-      <td>${p.name}</td>
+      <td class="sku">${escapeHtml(p.sku)}</td>
+      <td>${escapeHtml(p.name)}</td>
+      <td class="desc"><span title="${escapeHtml(p.description)}">${escapeHtml(p.description)}</span></td>
       <td>${money(p.price)}</td>
       <td>${p.stock}</td>
-      <td>${p.category}</td>
-      <td>${p.color}</td>
+      <td>${escapeHtml(p.category)}</td>
+      <td>${escapeHtml(p.color)}</td>
       <td class="row-actions">
         <button class="danger small" data-delete="${p.id}">Delete</button>
       </td>`;
@@ -163,6 +330,12 @@ async function fetchProducts() {
   document.querySelectorAll('[data-delete]').forEach((btn) => {
     btn.addEventListener('click', () => deleteProduct(btn.getAttribute('data-delete')));
   });
+}
+
+async function fetchProducts() {
+  const res = await fetch('/products');
+  allProducts = await res.json();
+  renderProducts();
 }
 
 async function deleteProduct(id) {
@@ -188,8 +361,8 @@ function renderDeleted() {
   for (const [id, p] of recentlyDeleted) {
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${p.sku}</td>
-      <td>${p.name}</td>
+      <td class="sku">${escapeHtml(p.sku)}</td>
+      <td>${escapeHtml(p.name)}</td>
       <td><button class="secondary small" data-restore="${id}">Restore</button></td>`;
     deletedBody.appendChild(tr);
   }
@@ -199,6 +372,53 @@ function renderDeleted() {
 }
 
 document.getElementById('refresh-btn').addEventListener('click', fetchProducts);
+searchBox.addEventListener('input', renderProducts);
+
+// Drag & drop / file picker
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('file');
+const dzText = document.getElementById('dz-text');
+const dzFile = document.getElementById('dz-file');
+
+dropzone.addEventListener('click', () => fileInput.click());
+['dragover', 'dragenter'].forEach((evt) =>
+  dropzone.addEventListener(evt, (e) => { e.preventDefault(); dropzone.classList.add('drag'); }));
+['dragleave', 'drop'].forEach((evt) =>
+  dropzone.addEventListener(evt, (e) => { e.preventDefault(); dropzone.classList.remove('drag'); }));
+dropzone.addEventListener('drop', (e) => {
+  const f = e.dataTransfer.files[0];
+  if (f) { fileInput.files = e.dataTransfer.files; showFileName(f); }
+});
+fileInput.addEventListener('change', () => {
+  if (fileInput.files[0]) showFileName(fileInput.files[0]);
+});
+function showFileName(f) {
+  dzText.textContent = 'File selected:';
+  dzFile.textContent = `${f.name} (${(f.size / 1024).toFixed(0)} KB)`;
+}
+
+// Timeline helpers
+const STEP_ORDER = ['uploaded', 'queued', 'processing', 'done'];
+function setTimeline(activeStep, errored) {
+  timelineEl.style.display = 'flex';
+  const activeIdx = STEP_ORDER.indexOf(activeStep);
+  document.querySelectorAll('.tl-step').forEach((el) => {
+    const idx = STEP_ORDER.indexOf(el.dataset.step);
+    el.classList.remove('done', 'active', 'error');
+    const dot = el.querySelector('.tl-dot');
+    if (idx < activeIdx) { el.classList.add('done'); dot.textContent = '✓'; }
+    else if (idx === activeIdx) {
+      if (errored) { el.classList.add('error'); dot.textContent = '!'; }
+      else { el.classList.add('active'); dot.textContent = idx + 1; }
+    } else { dot.textContent = idx + 1; }
+  });
+}
+function resetTimeline() {
+  timelineEl.style.display = 'none';
+  statsEl.style.display = 'none';
+  ratioBar.style.display = 'none';
+  alertsEl.innerHTML = '';
+}
 
 let pollTimer = null;
 
@@ -206,20 +426,37 @@ async function pollBatch(batchId) {
   const res = await fetch(`/uploads/${batchId}`);
   const batch = await res.json();
   const done = batch.status === 'COMPLETED' || batch.status === 'FAILED';
-  statusEl.innerHTML = `
-    Batch <code>${batch.batchId.slice(0, 8)}</code> &mdash;
-    <span class="badge ${batch.status}">${batch.status}</span>
-    ${done ? `&mdash; ${batch.successCount ?? 0} succeeded, ${batch.failCount ?? 0} failed of ${batch.totalRows ?? 0}` : '(processing in the background…)'}
-  `;
+  const structuralFailure = batch.status === 'FAILED' && !batch.totalRows;
+
+  if (batch.status === 'PENDING') setTimeline('queued');
+  else if (batch.status === 'PROCESSING') setTimeline('processing');
+  else if (done) setTimeline('done', structuralFailure);
+
+  statusEl.innerHTML = `<span class="badge ${batch.status}">${batch.status}</span>`;
+
   if (done) {
     clearTimeout(pollTimer);
     document.getElementById('upload-btn').disabled = false;
     fetchProducts();
-    if (batch.status === 'FAILED' && batch.errorMessage) {
-      statusEl.innerHTML += `<br/><span style="color:var(--red)">Reason: ${batch.errorMessage}</span>`;
-    }
-    if (batch.failCount > 0) {
-      statusEl.innerHTML += `<br/><span style="color:var(--muted)">Check your email for the failed-rows spreadsheet and reasons.</span>`;
+
+    if (structuralFailure) {
+      alertsEl.innerHTML = `<div class="alert error">Couldn't read this file${batch.errorMessage ? ': ' + escapeHtml(batch.errorMessage) : '.'}</div>`;
+    } else {
+      const total = batch.totalRows ?? 0;
+      const ok = batch.successCount ?? 0;
+      const bad = batch.failCount ?? 0;
+      document.getElementById('stat-total').textContent = total;
+      document.getElementById('stat-ok').textContent = ok;
+      document.getElementById('stat-bad').textContent = bad;
+      statsEl.style.display = 'grid';
+      ratioBar.style.display = 'block';
+      ratioFill.style.width = total ? `${Math.round((ok / total) * 100)}%` : '0%';
+
+      if (bad > 0) {
+        alertsEl.innerHTML = `<div class="alert info">${bad} row${bad === 1 ? '' : 's'} couldn't be imported. Check your email for the failed-rows spreadsheet and the reasons.</div>`;
+      } else {
+        alertsEl.innerHTML = `<div class="alert info" style="color:var(--green); border-color: rgba(74,222,128,0.35); background: var(--green-dim);">All rows imported successfully. A copy was emailed to you.</div>`;
+      }
     }
   } else {
     pollTimer = setTimeout(() => pollBatch(batchId), 2000);
@@ -228,7 +465,6 @@ async function pollBatch(batchId) {
 
 document.getElementById('upload-form').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const fileInput = document.getElementById('file');
   const email = document.getElementById('email').value;
   if (!fileInput.files[0]) return;
 
@@ -238,20 +474,26 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
 
   const btn = document.getElementById('upload-btn');
   btn.disabled = true;
-  statusEl.textContent = 'Uploading…';
+  btn.innerHTML = '<span class="spinner"></span> Uploading…';
+  resetTimeline();
+  setTimeline('uploaded');
+  statusEl.textContent = '';
 
   try {
     const res = await fetch('/uploads', { method: 'POST', body: formData });
+    btn.innerHTML = 'Upload';
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      statusEl.innerHTML = `<span style="color:var(--red)">${err.message || 'Upload failed.'}</span>`;
+      alertsEl.innerHTML = `<div class="alert error">${escapeHtml(err.message || 'Upload failed.')}</div>`;
+      timelineEl.style.display = 'none';
       btn.disabled = false;
       return;
     }
     const { batchId } = await res.json();
     pollBatch(batchId);
   } catch (err) {
-    statusEl.innerHTML = `<span style="color:var(--red)">${err.message}</span>`;
+    btn.innerHTML = 'Upload';
+    alertsEl.innerHTML = `<div class="alert error">${escapeHtml(err.message)}</div>`;
     btn.disabled = false;
   }
 });
