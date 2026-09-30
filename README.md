@@ -1,20 +1,36 @@
-# E-commerce Product Processor
+# Bulk Product Importer
 
-Event-driven bulk product import: a client uploads an Excel sheet (from a
-small web page, or via the API directly), the file is stashed in
-S3-compatible storage, an event announces the upload over RabbitMQ, a BullMQ
-worker does the actual parsing/validating/inserting, and Nodemailer emails a
-summary — with the imported-products and failed-rows spreadsheets attached,
-whichever apply.
+A backend service that lets an e-commerce client bulk-import products from an
+Excel sheet instead of adding them one by one. The upload responds instantly;
+the actual file processing runs asynchronously through an event-driven
+pipeline, and the client gets an emailed report of what succeeded and what
+didn't.
 
-**Live deployment:** https://excel-importer-production-dace.up.railway.app
-(hosted on Railway; see [Deployment](#deployment) below for how it's wired up
-and why email works differently there than in local dev).
+**Live demo:** https://excel-importer-production-dace.up.railway.app
 
-See [`docs/PROCESSOR_GUIDE.md`](docs/PROCESSOR_GUIDE.md) for the full
-concept write-up — what RabbitMQ vs. BullMQ are for, why event-driven
-architecture, why every DB query has a cost, why DELETE is the expensive one,
-and why soft delete. This README is just the practical run-it guide.
+## Features
+
+- **Drag-and-drop web UI** — upload a file, watch a live progress timeline, browse/search/delete/restore products.
+- **Non-blocking upload** — the API responds immediately; a background worker does the actual processing.
+- **Per-row validation** — required fields, SKU uniqueness, numeric checks; bad rows are skipped and logged, not the whole file.
+- **Tolerant column matching** — headers are case-insensitive, and common synonyms are accepted (`Colors` for `color`, `Inventory` for `stock`).
+- **Emailed report** — a summary of counts, plus two attached spreadsheets: the products that were imported, and the rows that failed with a reason for each.
+- **Soft delete** — deleting a product hides it, not erases it; it can be restored, and its SKU becomes reusable once deleted.
+
+## Tech stack
+
+| Layer | Choice |
+|---|---|
+| Backend framework | NestJS (TypeScript) |
+| Database | PostgreSQL (via Prisma ORM) |
+| Job queue | BullMQ (Redis-backed) |
+| Message bus | RabbitMQ |
+| File storage | S3-compatible object storage |
+| Spreadsheet I/O | ExcelJS |
+| Validation | class-validator (row data), Zod (environment config) |
+| Email | Nodemailer, with an HTTPS relay fallback for hosts that block SMTP |
+| Frontend | Static HTML/CSS/JS, no build step |
+| Deployment | Railway (CI/CD from `main`) |
 
 ## Architecture
 
@@ -28,9 +44,9 @@ Client → POST /uploads → S3 (raw file) → UploadBatch (status: PENDING)
                                       enqueue BullMQ job
                                                 ▼
                                      ProcessingProcessor (worker)
-                        (downloads file, parses rows, validates each via
-                         class-validator, batch-inserts valid rows, builds
-                         failed-rows.xlsx if needed, updates UploadBatch)
+                        (downloads file, parses rows, validates each,
+                         batch-inserts valid rows, builds the
+                         imported/failed spreadsheets, updates UploadBatch)
                                                 │
                                     emit "product.file.processed" (RabbitMQ)
                                                 ▼
@@ -38,175 +54,108 @@ Client → POST /uploads → S3 (raw file) → UploadBatch (status: PENDING)
                                                 │
                                         MailerService → email
 
-Client → GET /uploads/:id → polls UploadBatch status/counts
-Client → GET/DELETE /products, POST /products/:id/restore → soft-delete CRUD
+Client → GET  /uploads/:id                → poll batch status/counts
+Client → GET  /products                   → list active products
+Client → DELETE /products/:id             → soft delete
+Client → POST /products/:id/restore       → restore
 ```
 
-`public/index.html` is a small static page (upload form, live status, product
-table) served at `/` alongside the API — see [Using it](#4-using-it) below.
+The upload endpoint only stores the file and emits an event — it never
+parses the sheet itself, which is what keeps the HTTP response fast
+regardless of file size. `public/index.html` is a static page served
+alongside the API at `/` that exercises these same endpoints.
 
-Everything above runs in **one Nest process** (`npm run start:dev`) — it's a
-hybrid app that serves HTTP and listens on RabbitMQ at the same time. That's
-simpler to run than the two-process (API + worker) split you might expect;
-BullMQ's async job processing still keeps heavy Excel work off the HTTP
-request path.
+See [`docs/PROCESSOR_GUIDE.md`](docs/PROCESSOR_GUIDE.md) for a deeper
+write-up of the design decisions (why RabbitMQ *and* BullMQ, why soft delete,
+why S3 and a database are both needed).
 
-## 1. Prerequisites
+## Running it locally
 
-No Docker, no local installs, no credit card — four free services, each a
-sign-up-and-copy-a-connection-string away.
+### 1. Prerequisites
 
-### PostgreSQL — Neon free tier
-1. Sign up at https://neon.tech (no card).
-2. Create a project — it provisions a free Postgres database immediately.
-3. Copy the connection string from the dashboard (starts with `postgresql://`,
-   includes `?sslmode=require`).
-4. Put it in `.env` as `DATABASE_URL`.
+Four free-tier services, each just a sign-up:
 
-### Redis — Upstash free tier
-1. Sign up at https://upstash.com/, create a Redis database (any region).
-2. Copy the **TLS connection string** (`rediss://...`) from the database page.
-3. Put it in `.env` as `REDIS_URL`.
+| Service | Used for | Free tier |
+|---|---|---|
+| [Neon](https://neon.tech) | PostgreSQL | No card required |
+| [Upstash](https://upstash.com) | Redis (BullMQ) | No card required |
+| [CloudAMQP](https://www.cloudamqp.com) | RabbitMQ | No card required |
+| [Backblaze B2](https://www.backblaze.com/sign-up/cloud-storage) | S3-compatible storage | No card required |
 
-### RabbitMQ — CloudAMQP free tier
-1. Sign up at https://www.cloudamqp.com/ (no card), create an instance on the
-   free **"Little Lemur"** plan.
-2. On the instance's details page, copy the **AMQP URL** (starts with `amqps://`).
-3. Put it in `.env` as `RABBITMQ_URL`.
+Copy each service's connection string into `.env` (see `.env.example`).
 
-### S3-compatible storage — Backblaze B2
-AWS requires a card even for its free tier; B2 doesn't, and speaks the same
-S3 API via `@aws-sdk/client-s3` pointed at a custom endpoint.
-1. Sign up at https://www.backblaze.com/sign-up/cloud-storage (no card).
-2. **Buckets → Create a Bucket** — name it (globally unique), keep it **Private**.
-3. Open the bucket's details, note the **Endpoint**, e.g.
-   `s3.us-west-004.backblazeb2.com` (`us-west-004` is your region).
-4. **App Keys → Add a New Application Key**, scoped to this bucket. Copy the
-   `keyID` and `applicationKey` immediately — the secret is shown once.
-5. Fill in `.env`:
-   ```
-   AWS_REGION=<region from the endpoint, e.g. us-west-004>
-   AWS_ACCESS_KEY_ID=<keyID>
-   AWS_SECRET_ACCESS_KEY=<applicationKey>
-   S3_BUCKET_NAME=<your bucket name>
-   S3_ENDPOINT=https://s3.<region>.backblazeb2.com
-   S3_FORCE_PATH_STYLE=true
-   ```
+### 2. Email
 
-### Email — two options
+For local testing, an [Ethereal](https://ethereal.email) test account works
+with zero setup (fake inbox, viewable on their site). For a real inbox,
+use Gmail SMTP with an [app password](https://myaccount.google.com/apppasswords).
 
-**Local dev (fake inbox, zero setup):** go to https://ethereal.email/, click
-"Create Ethereal Account", and put the generated credentials in `.env`:
-```
-SMTP_HOST=smtp.ethereal.email
-SMTP_PORT=587
-SMTP_USER=<generated user>
-SMTP_PASS=<generated pass>
-```
-Sent mail shows up in Ethereal's web inbox, not a real mailbox.
+Some hosts block outbound SMTP entirely (Railway's free plan does). For
+those, set `EMAIL_RELAY_URL`/`EMAIL_RELAY_TOKEN` instead of `SMTP_*` — this
+points at a small Google Apps Script web app that sends the mail over HTTPS
+instead. Details in `.env.example` and `MailerService.sendViaRelay`.
 
-**Real email (e.g. for a deployed instance):** point `SMTP_HOST` at
-`smtp.gmail.com` with a Gmail address and an
-[app password](https://myaccount.google.com/apppasswords). This works from a
-local machine, but **some hosts (Railway's free plan included) block outbound
-SMTP entirely**, so a direct Gmail connection from there just times out.
-
-For those hosts, use the `EMAIL_RELAY_URL`/`EMAIL_RELAY_TOKEN` pair instead of
-`SMTP_*`. It points at a small Google Apps Script web app (deployed from your
-own Google account, `Deploy → New deployment → Web app`, access set to
-**Anyone**) that receives the email payload over HTTPS — which isn't blocked
-— and sends it via `MailApp.sendEmail` from your real Gmail. See
-`MailerService.sendViaRelay` in the code for the exact payload shape. When
-`EMAIL_RELAY_URL` is set, it's used instead of SMTP; otherwise SMTP is used.
-
-## 2. Setup
+### 3. Setup and run
 
 ```bash
 npm install
-cp .env.example .env      # fill in the five services above
-npx prisma migrate dev --name init   # creates the Product/UploadBatch tables on Neon
-```
-
-## 3. Run it
-
-```bash
+cp .env.example .env      # fill in the values above
+npx prisma migrate dev --name init
 npm run start:dev
 ```
-One process, one terminal. On boot you should see both "HTTP listening on
-port 4000" and "RabbitMQ microservice connected" — if the second line is
-missing or errors, double-check `RABBITMQ_URL`.
 
-## 4. Using it
+On boot you should see both `HTTP listening on port 4000` and `RabbitMQ
+microservice connected`.
 
-Open http://localhost:4000 (or the deployed URL) for the web page: a
-drag-and-drop upload with a live status timeline, a product table with
-delete/restore, and search. Or use the API directly, as in the curl examples
-below — the page and the API hit the exact same endpoints.
+### 4. Try it
 
-## 5. Generate a test file and try the full flow
+Open http://localhost:4000 for the web UI, or generate a sample file and use
+the API directly:
 
 ```bash
 npm run sample:generate
-```
-Writes `sample-products.xlsx` with 5 rows: two valid, one missing a price,
-one duplicate SKU, and one with non-numeric stock — so you see both success
-and failure paths in one run.
-
-Upload it:
-```bash
 curl -X POST http://localhost:4000/uploads \
   -F "file=@sample-products.xlsx" \
   -F "userEmail=you@example.com"
 ```
-Response:
-```json
-{ "batchId": "a1b2c3...", "status": "PENDING" }
-```
 
-Poll status:
-```bash
-curl http://localhost:4000/uploads/a1b2c3...
-```
-You'll see `PENDING` → `PROCESSING` → `COMPLETED` with `totalRows`,
-`successCount`, `failCount` filled in. Check the app's terminal logs for the
-RabbitMQ event → BullMQ job → email chain, and check Ethereal's web inbox for
-the report (with `failed-rows.xlsx` attached).
+Poll `GET /uploads/:batchId` to watch it go `PENDING` → `PROCESSING` →
+`COMPLETED`, with `totalRows`/`successCount`/`failCount` filled in.
 
-Try the product endpoints:
-```bash
-curl http://localhost:4000/products                    # list (excludes soft-deleted)
-curl -X DELETE http://localhost:4000/products/<id>      # soft delete
-curl -X POST http://localhost:4000/products/<id>/restore
-```
-
-## Required column format (for future uploads)
+## Required spreadsheet format
 
 First row = headers, any order:
 
-| sku (required, unique) | name (required) | description (required) | price (required, > 0) | category (required) | color (required) | stock (required, ≥ 0) |
+| sku (unique) | name | description | price (> 0) | category | color | stock (≥ 0) |
 |---|---|---|---|---|---|---|
 | SKU-001 | Classic T-Shirt | A comfortable cotton t-shirt | 19.99 | Apparel | Blue | 100 |
 
-Header matching is case-insensitive, and two columns accept a common
-alternate name: `color` also accepts `colors`, and `stock` also accepts
-`inventory`. A file missing a required column is rejected outright (with the
-missing column names in the error); a file with the right columns but bad
-row data still processes, and the bad rows land in the emailed
-`failed-rows.xlsx` instead, each with a reason in its `errors` column.
+`color` also accepts `colors`; `stock` also accepts `inventory`. A file
+missing a required column is rejected outright; a file with the right
+columns but bad row data still processes, and the bad rows are listed with
+their reasons in the emailed report.
 
 ## Deployment
 
-The live instance runs on [Railway](https://railway.com), deployed straight
-from this repo's `main` branch — every push redeploys it automatically.
+Deployed on [Railway](https://railway.com) from this repo's `main` branch —
+every push redeploys automatically.
 
-- **Build command:** `npm install && npx prisma generate && npm run build`
-- **Start command:** `npm run start:prod`
-- **Environment variables:** the same ones from `.env.example`, minus `PORT`
-  (Railway injects its own) and using `EMAIL_RELAY_URL`/`EMAIL_RELAY_TOKEN`
-  instead of `SMTP_*` — Railway's plan blocks outbound SMTP, so a direct
-  Gmail connection times out there even though it works locally.
-- **Public URL:** Settings → Networking → Generate Domain.
+- **Build:** `npm install && npx prisma generate && npm run build`
+- **Start:** `npm run start:prod`
+- **Environment:** same as `.env.example`, minus `PORT` (host-injected)
 
-To deploy your own copy on a different host, the same build/start commands
-apply; whether you need the `EMAIL_RELAY_*` workaround depends on whether
-that host allows outbound SMTP.
+## Project structure
+
+```
+src/
+├─ upload/          # POST /uploads — stores the file, emits the event
+├─ messaging/        # RabbitMQ connection and event constants
+├─ processing/        # BullMQ worker — parsing, validation, spreadsheet generation
+├─ notification/      # Emails the report (SMTP or HTTPS relay)
+├─ product/          # Product CRUD + soft delete
+├─ prisma/           # Database client
+└─ config/           # Environment variable validation
+public/index.html     # Web UI
+prisma/schema.prisma  # Data model
+docs/PROCESSOR_GUIDE.md # Design write-up
+```

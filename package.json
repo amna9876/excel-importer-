@@ -1,5 +1,5 @@
 {
-  "name": "ecommerce-processor",
+  "name": "product-bulk-importer",
   "version": "1.0.0",
   "description": "Event-driven bulk product import: S3 + RabbitMQ + BullMQ + Prisma/PostgreSQL",
   "license": "UNLICENSED",

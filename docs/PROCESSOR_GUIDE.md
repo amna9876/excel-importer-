@@ -1,4 +1,4 @@
-# E-commerce Product Processor — Guide
+# Bulk Product Importer — Design Guide
 
 ## Context
 
